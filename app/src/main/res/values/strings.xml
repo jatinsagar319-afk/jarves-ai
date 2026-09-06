@@ -1,0 +1,9 @@
+<resources>
+
+    <string name="app_name">Jarves</string>
+
+    <string name="accessibility_description">
+        Jarves ko phone par supported actions perform karne ke liye Accessibility permission chahiye.
+    </string>
+
+</resources>
