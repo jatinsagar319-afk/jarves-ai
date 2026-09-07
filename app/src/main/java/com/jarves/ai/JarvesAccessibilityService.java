@@ -308,4 +308,4 @@ public class JarvesAccessibilityService extends AccessibilityService {
             }
         }
     }
-                    }
+}
