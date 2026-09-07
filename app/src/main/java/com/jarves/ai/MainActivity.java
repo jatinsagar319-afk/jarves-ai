@@ -6,12 +6,13 @@ import android.content.Intent;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.provider.Settings;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
+import android.net.Uri;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,15 +56,18 @@ public class MainActivity extends Activity {
 
         voiceButton.setOnClickListener(v -> startListening());
 
-        accessibilityButton.setOnClickListener(v -> openAccessibility());
+        accessibilityButton.setOnClickListener(
+                v -> openAccessibility()
+        );
 
         statusText.setText("Jarves ready");
     }
 
     private void startListening() {
 
-        Intent intent =
-                new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        Intent intent = new Intent(
+                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+        );
 
         intent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -81,7 +85,10 @@ public class MainActivity extends Activity {
         );
 
         try {
-            startActivityForResult(intent, VOICE_REQUEST);
+            startActivityForResult(
+                    intent,
+                    VOICE_REQUEST
+            );
         } catch (Exception e) {
             statusText.setText(
                     "Voice recognition available nahi hai."
@@ -113,7 +120,8 @@ public class MainActivity extends Activity {
 
             if (results != null && !results.isEmpty()) {
 
-                String command = results.get(0).trim();
+                String command =
+                        results.get(0).trim();
 
                 commandText.setText(command);
 
@@ -127,22 +135,65 @@ public class MainActivity extends Activity {
         String cmd =
                 command.toLowerCase(Locale.ROOT);
 
-        if (cmd.contains("settings")
-                || cmd.contains("setting")
-                || cmd.contains("सेटिंग")) {
+        if (containsAny(
+                cmd,
+                "home",
+                "go home",
+                "ghar",
+                "ghar jao",
+                "home jao"
+        )) {
+            performHome();
+            return;
+        }
 
+        if (containsAny(
+                cmd,
+                "back",
+                "go back",
+                "peeche",
+                "piche",
+                "wapas",
+                "wapas jao"
+        )) {
+            performBack();
+            return;
+        }
+
+        if (containsAny(
+                cmd,
+                "recent",
+                "recent apps",
+                "recent app",
+                "recent kholo"
+        )) {
+            performRecents();
+            return;
+        }
+
+        if (containsAny(
+                cmd,
+                "settings",
+                "setting",
+                "सेटिंग"
+        )) {
             openSettings();
             return;
         }
 
-        /*
-         * "open/launch/start" words ko hata kar
-         * app ka naam identify karne ki koshish.
-         */
-        String appName = extractAppName(cmd);
+        if (containsAny(
+                cmd,
+                "accessibility",
+                "phone control"
+        )) {
+            openAccessibility();
+            return;
+        }
 
-        if (appName.length() > 0) {
+        String appName =
+                extractAppName(cmd);
 
+        if (!appName.isEmpty()) {
             openInstalledApp(appName);
             return;
         }
@@ -152,6 +203,77 @@ public class MainActivity extends Activity {
         );
 
         speak("Command received.");
+    }
+
+    private void performHome() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service != null) {
+
+            if (service.goHome()) {
+                statusText.setText(
+                        "Home par ja raha hoon"
+                );
+                speak("Going home.");
+            } else {
+                speak("I could not go home.");
+            }
+
+        } else {
+            speak(
+                    "Phone control service is not active."
+            );
+        }
+    }
+
+    private void performBack() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service != null) {
+
+            if (service.globalBack()) {
+                statusText.setText(
+                        "Back ja raha hoon"
+                );
+                speak("Going back.");
+            } else {
+                speak("I could not go back.");
+            }
+
+        } else {
+            speak(
+                    "Phone control service is not active."
+            );
+        }
+    }
+
+    private void performRecents() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service != null) {
+
+            if (service.openRecents()) {
+                statusText.setText(
+                        "Recent apps open kar raha hoon"
+                );
+                speak("Opening recent apps.");
+            } else {
+                speak(
+                        "I could not open recent apps."
+                );
+            }
+
+        } else {
+            speak(
+                    "Phone control service is not active."
+            );
+        }
     }
 
     private String extractAppName(String command) {
@@ -166,7 +288,7 @@ public class MainActivity extends Activity {
                 "khol",
                 "kholo",
                 "chalao",
-                "chalाओ",
+                "chala",
                 "app",
                 "application",
                 "jarves",
@@ -180,14 +302,17 @@ public class MainActivity extends Activity {
         return name.trim();
     }
 
-    private void openInstalledApp(String requestedName) {
+    private void openInstalledApp(
+            String requestedName) {
 
-        PackageManager pm = getPackageManager();
+        PackageManager pm =
+                getPackageManager();
 
-        Intent launcherIntent = new Intent(
-                Intent.ACTION_MAIN,
-                null
-        );
+        Intent launcherIntent =
+                new Intent(
+                        Intent.ACTION_MAIN,
+                        null
+                );
 
         launcherIntent.addCategory(
                 Intent.CATEGORY_LAUNCHER
@@ -200,7 +325,9 @@ public class MainActivity extends Activity {
                 );
 
         String searchName =
-                requestedName.toLowerCase(Locale.ROOT);
+                requestedName.toLowerCase(
+                        Locale.ROOT
+                );
 
         for (ResolveInfo info : apps) {
 
@@ -208,7 +335,9 @@ public class MainActivity extends Activity {
                     info.loadLabel(pm).toString();
 
             String labelLower =
-                    label.toLowerCase(Locale.ROOT);
+                    label.toLowerCase(
+                            Locale.ROOT
+                    );
 
             if (labelLower.equals(searchName)
                     || labelLower.contains(searchName)
@@ -223,34 +352,27 @@ public class MainActivity extends Activity {
 
                     if (launchIntent != null) {
 
-                        launchIntent.addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK
-                        );
-
                         startActivity(launchIntent);
 
                         statusText.setText(
-                                label + " open kar raha hoon"
+                                label +
+                                " open kar raha hoon"
                         );
 
-                        speak("Opening " + label);
+                        speak(
+                                "Opening " + label
+                        );
+
                         return;
                     }
 
-                } catch (Exception e) {
-                    // Try next matching app.
+                } catch (Exception ignored) {
                 }
             }
         }
 
-        /*
-         * Agar exact app naam nahi mila,
-         * kuch common app aliases check karo.
-         */
         String packageName =
-                findCommonAppPackage(
-                        searchName
-                );
+                findCommonAppPackage(searchName);
 
         if (packageName != null) {
 
@@ -269,9 +391,34 @@ public class MainActivity extends Activity {
                             "App open kar raha hoon"
                     );
 
-                    speak("Opening application.");
+                    speak(
+                            "Opening application."
+                    );
+
                     return;
                 }
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (searchName.contains("youtube")) {
+
+            try {
+
+                Intent browser =
+                        new Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                        "https://www.youtube.com"
+                                )
+                        );
+
+                startActivity(browser);
+
+                speak("Opening YouTube.");
+
+                return;
 
             } catch (Exception ignored) {
             }
@@ -288,40 +435,42 @@ public class MainActivity extends Activity {
         );
     }
 
-    private String findCommonAppPackage(String name) {
+    private String findCommonAppPackage(
+            String name) {
 
-        PackageManager pm = getPackageManager();
+        PackageManager pm =
+                getPackageManager();
 
-        String[] possiblePackages;
+        String[] packages;
 
         if (name.contains("whatsapp")) {
 
-            possiblePackages = new String[] {
+            packages = new String[]{
                     "com.whatsapp",
                     "com.whatsapp.w4b"
             };
 
         } else if (name.contains("youtube")) {
 
-            possiblePackages = new String[] {
+            packages = new String[]{
                     "com.google.android.youtube"
             };
 
         } else if (name.contains("instagram")) {
 
-            possiblePackages = new String[] {
+            packages = new String[]{
                     "com.instagram.android"
             };
 
         } else if (name.contains("facebook")) {
 
-            possiblePackages = new String[] {
+            packages = new String[]{
                     "com.facebook.katana"
             };
 
         } else if (name.contains("telegram")) {
 
-            possiblePackages = new String[] {
+            packages = new String[]{
                     "org.telegram.messenger"
             };
 
@@ -330,7 +479,7 @@ public class MainActivity extends Activity {
             return null;
         }
 
-        for (String packageName : possiblePackages) {
+        for (String packageName : packages) {
 
             try {
 
@@ -344,7 +493,8 @@ public class MainActivity extends Activity {
                     return packageName;
                 }
 
-            } catch (PackageManager.NameNotFoundException ignored) {
+            } catch (
+                    PackageManager.NameNotFoundException ignored) {
             }
         }
 
@@ -356,7 +506,9 @@ public class MainActivity extends Activity {
         try {
 
             Intent intent =
-                    new Intent(Settings.ACTION_SETTINGS);
+                    new Intent(
+                            Settings.ACTION_SETTINGS
+                    );
 
             startActivity(intent);
 
@@ -397,6 +549,20 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean containsAny(
+            String text,
+            String... words) {
+
+        for (String word : words) {
+
+            if (text.contains(word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void speak(String text) {
 
         if (jarvesVoice != null) {
@@ -420,4 +586,4 @@ public class MainActivity extends Activity {
 
         super.onDestroy();
     }
-                }
+        }
