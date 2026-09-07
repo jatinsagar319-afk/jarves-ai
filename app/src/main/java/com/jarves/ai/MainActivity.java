@@ -163,9 +163,59 @@ public class MainActivity extends Activity {
     }
 
     private void openApp(
-            String packageName,
-            String appName
-    ) {
+        String packageName,
+        String appName
+) {
+
+    try {
+        Intent launchIntent =
+                getPackageManager()
+                        .getLaunchIntentForPackage(packageName);
+
+        if (launchIntent != null) {
+
+            launchIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+            );
+
+            startActivity(launchIntent);
+
+            statusText.setText(
+                    appName + " open kar raha hoon"
+            );
+
+            speak(appName + " opening.");
+
+        } else {
+
+            // Fallback: open the app's website
+            Intent webIntent = new Intent(
+                    Intent.ACTION_VIEW,
+                    android.net.Uri.parse(
+                            "https://www.youtube.com"
+                    )
+            );
+
+            startActivity(webIntent);
+
+            statusText.setText(
+                    appName + " open karne ki koshish kar raha hoon"
+            );
+
+            speak("Opening " + appName + ".");
+        }
+
+    } catch (Exception e) {
+
+        statusText.setText(
+                "Unable to open " + appName
+        );
+
+        speak(
+                "I could not open " + appName
+        );
+    }
+    } {
 
         Intent launchIntent =
                 getPackageManager()
