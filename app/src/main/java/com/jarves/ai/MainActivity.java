@@ -3,11 +3,13 @@ package com.jarves.ai;
 import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
-import android.provider.Settings;
 import android.speech.RecognizerIntent;
-import android.view.View;
+import android.speech.tts.TextToSpeech;
+import android.provider.Settings;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import java.util.ArrayList;
 import java.util.Locale;
 
@@ -17,6 +19,7 @@ public class MainActivity extends Activity {
 
     private TextView commandText;
     private TextView statusText;
+    private TextToSpeech jarvesVoice;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,18 +31,37 @@ public class MainActivity extends Activity {
         statusText = findViewById(R.id.statusText);
 
         Button voiceButton = findViewById(R.id.voiceButton);
-        Button accessibilityButton = findViewById(R.id.accessibilityButton);
+        Button accessibilityButton =
+                findViewById(R.id.accessibilityButton);
 
-        voiceButton.setOnClickListener(v -> startVoiceRecognition());
+        jarvesVoice = new TextToSpeech(
+                this,
+                result -> {
+                    if (result == TextToSpeech.SUCCESS) {
+                        jarvesVoice.setLanguage(Locale.getDefault());
+                    }
+                }
+        );
+
+        voiceButton.setOnClickListener(v ->
+                startListening()
+        );
 
         accessibilityButton.setOnClickListener(v -> {
-            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            Intent intent =
+                    new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+
             startActivity(intent);
         });
+
+        statusText.setText("Jarves ready");
+        speak("Jarves is ready.");
     }
 
-    private void startVoiceRecognition() {
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+    private void startListening() {
+
+        Intent intent =
+                new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
 
         intent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -53,13 +75,21 @@ public class MainActivity extends Activity {
 
         intent.putExtra(
                 RecognizerIntent.EXTRA_PROMPT,
-                "Jarves ko command dijiye..."
+                "Jarves ko command dijiye"
         );
 
         try {
-            startActivityForResult(intent, VOICE_REQUEST);
+            startActivityForResult(
+                    intent,
+                    VOICE_REQUEST
+            );
         } catch (Exception e) {
-            commandText.setText("Voice recognition available nahi hai.");
+
+            Toast.makeText(
+                    this,
+                    "Voice recognition available nahi hai",
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
@@ -69,7 +99,12 @@ public class MainActivity extends Activity {
             int resultCode,
             Intent data
     ) {
-        super.onActivityResult(requestCode, resultCode, data);
+
+        super.onActivityResult(
+                requestCode,
+                resultCode,
+                data
+        );
 
         if (requestCode == VOICE_REQUEST
                 && resultCode == RESULT_OK
@@ -81,6 +116,7 @@ public class MainActivity extends Activity {
                     );
 
             if (results != null && !results.isEmpty()) {
+
                 String command = results.get(0);
 
                 commandText.setText(command);
@@ -92,49 +128,111 @@ public class MainActivity extends Activity {
 
     private void executeCommand(String command) {
 
-        String lower = command.toLowerCase(Locale.ROOT);
+        String cmd =
+                command.toLowerCase(Locale.ROOT);
 
-        if (lower.contains("youtube")) {
+        if (cmd.contains("youtube")) {
 
-            Intent intent = getPackageManager()
-                    .getLaunchIntentForPackage(
-                            "com.google.android.youtube"
-                    );
-
-            if (intent != null) {
-                startActivity(intent);
-                statusText.setText("YouTube open kar raha hoon...");
-            } else {
-                statusText.setText("YouTube installed nahi mila.");
-            }
-
-        } else if (lower.contains("whatsapp")) {
-
-            Intent intent = getPackageManager()
-                    .getLaunchIntentForPackage(
-                            "com.whatsapp"
-                    );
-
-            if (intent != null) {
-                startActivity(intent);
-                statusText.setText("WhatsApp open kar raha hoon...");
-            } else {
-                statusText.setText("WhatsApp installed nahi mila.");
-            }
-
-        } else if (lower.contains("settings")) {
-
-            startActivity(
-                    new Intent(Settings.ACTION_SETTINGS)
+            openApp(
+                    "com.google.android.youtube",
+                    "YouTube"
             );
 
-            statusText.setText("Settings open kar raha hoon...");
+        } else if (cmd.contains("whatsapp")) {
+
+            openApp(
+                    "com.whatsapp",
+                    "WhatsApp"
+            );
+
+        } else if (cmd.contains("settings")
+                || cmd.contains("setting")) {
+
+            openSettings();
 
         } else {
 
             statusText.setText(
-                    "Command samajh gaya: " + command
+                    "Command: " + command
+            );
+
+            speak(
+                    "Command received. " + command
             );
         }
     }
-                      }
+
+    private void openApp(
+            String packageName,
+            String appName
+    ) {
+
+        Intent launchIntent =
+                getPackageManager()
+                        .getLaunchIntentForPackage(
+                                packageName
+                        );
+
+        if (launchIntent != null) {
+
+            startActivity(launchIntent);
+
+            statusText.setText(
+                    appName + " open kar raha hoon"
+            );
+
+            speak(
+                    appName + " opening."
+            );
+
+        } else {
+
+            statusText.setText(
+                    appName + " installed nahi hai"
+            );
+
+            speak(
+                    appName + " is not installed."
+            );
+        }
+    }
+
+    private void openSettings() {
+
+        Intent intent =
+                new Intent(Settings.ACTION_SETTINGS);
+
+        startActivity(intent);
+
+        statusText.setText(
+                "Settings open kar raha hoon"
+        );
+
+        speak("Opening settings.");
+    }
+
+    private void speak(String text) {
+
+        if (jarvesVoice != null) {
+
+            jarvesVoice.speak(
+                    text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "JARVES_RESPONSE"
+            );
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        if (jarvesVoice != null) {
+
+            jarvesVoice.stop();
+            jarvesVoice.shutdown();
+        }
+
+        super.onDestroy();
+    }
+            }
