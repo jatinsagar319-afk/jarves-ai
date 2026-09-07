@@ -8,29 +8,29 @@ public class JarvesAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Future Jarves commands yahan process honge.
+        // Jarves future commands yahan process karega.
     }
 
     @Override
     public void onInterrupt() {
-        // Service interrupted.
+        // Accessibility service interrupted.
     }
 
-    public void clickText(String text) {
+    public boolean clickText(String text) {
 
-        AccessibilityNodeInfo root = getRootInActiveWindow();
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow();
 
         if (root == null) {
-            return;
+            return false;
         }
 
-        clickNode(root, text);
+        return clickNode(root, text);
     }
 
     private boolean clickNode(
             AccessibilityNodeInfo node,
-            String text
-    ) {
+            String text) {
 
         if (node == null) {
             return false;
@@ -42,10 +42,9 @@ public class JarvesAccessibilityService extends AccessibilityService {
                 nodeText.toString().equalsIgnoreCase(text)) {
 
             if (node.isClickable()) {
-                node.performAction(
+                return node.performAction(
                         AccessibilityNodeInfo.ACTION_CLICK
                 );
-                return true;
             }
         }
 
@@ -56,14 +55,11 @@ public class JarvesAccessibilityService extends AccessibilityService {
 
             if (child != null) {
 
-                boolean clicked =
-                        clickNode(child, text);
-
-                child.recycle();
-
-                if (clicked) {
+                if (clickNode(child, text)) {
                     return true;
                 }
+
+                child.recycle();
             }
         }
 
