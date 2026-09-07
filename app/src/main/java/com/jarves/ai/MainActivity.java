@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.provider.Settings;
+import android.net.Uri;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,34 +35,56 @@ public class MainActivity extends Activity {
         Button accessibilityButton =
                 findViewById(R.id.accessibilityButton);
 
+        // Jarves voice
         jarvesVoice = new TextToSpeech(
                 this,
                 result -> {
                     if (result == TextToSpeech.SUCCESS) {
-                        jarvesVoice.setLanguage(Locale.getDefault());
+                        int languageResult =
+                                jarvesVoice.setLanguage(Locale.getDefault());
+
+                        if (languageResult ==
+                                TextToSpeech.LANG_MISSING_DATA ||
+                                languageResult ==
+                                TextToSpeech.LANG_NOT_SUPPORTED) {
+
+                            jarvesVoice.setLanguage(Locale.US);
+                        }
                     }
                 }
         );
 
-        voiceButton.setOnClickListener(v ->
-                startListening()
-        );
+        voiceButton.setOnClickListener(v -> {
+            startListening();
+        });
 
         accessibilityButton.setOnClickListener(v -> {
-            Intent intent =
-                    new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            try {
+                Intent intent =
+                        new Intent(
+                                Settings.ACTION_ACCESSIBILITY_SETTINGS
+                        );
 
-            startActivity(intent);
+                startActivity(intent);
+
+            } catch (Exception e) {
+                Toast.makeText(
+                        this,
+                        "Accessibility settings open nahi ho paayi.",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
         });
 
         statusText.setText("Jarves ready");
-        speak("Jarves is ready.");
     }
 
     private void startListening() {
 
         Intent intent =
-                new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                new Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                );
 
         intent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -79,17 +102,21 @@ public class MainActivity extends Activity {
         );
 
         try {
+
             startActivityForResult(
                     intent,
                     VOICE_REQUEST
             );
+
         } catch (Exception e) {
 
-            Toast.makeText(
-                    this,
-                    "Voice recognition available nahi hai",
-                    Toast.LENGTH_SHORT
-            ).show();
+            statusText.setText(
+                    "Voice recognition available nahi hai."
+            );
+
+            speak(
+                    "Voice recognition is not available."
+            );
         }
     }
 
@@ -117,9 +144,12 @@ public class MainActivity extends Activity {
 
             if (results != null && !results.isEmpty()) {
 
-                String command = results.get(0);
+                String command =
+                        results.get(0).trim();
 
-                commandText.setText(command);
+                commandText.setText(
+                        command
+                );
 
                 executeCommand(command);
             }
@@ -129,136 +159,240 @@ public class MainActivity extends Activity {
     private void executeCommand(String command) {
 
         String cmd =
-                command.toLowerCase(Locale.ROOT);
+                command.toLowerCase(
+                        Locale.ROOT
+                );
 
-        if (cmd.contains("youtube")) {
+        // YouTube
+        if (containsAny(
+                cmd,
+                "youtube",
+                "you tube"
+        )) {
 
             openApp(
                     "com.google.android.youtube",
                     "YouTube"
             );
 
-        } else if (cmd.contains("whatsapp")) {
+        // WhatsApp
+        } else if (containsAny(
+                cmd,
+                "whatsapp",
+                "what's app",
+                "whats app"
+        )) {
 
             openApp(
                     "com.whatsapp",
                     "WhatsApp"
             );
 
-        } else if (cmd.contains("settings")
-                || cmd.contains("setting")) {
+        // Settings
+        } else if (containsAny(
+                cmd,
+                "settings",
+                "setting",
+                "सेटिंग"
+        )) {
 
             openSettings();
 
+        // Accessibility
+        } else if (containsAny(
+                cmd,
+                "accessibility",
+                "phone control"
+        )) {
+
+            openAccessibility();
+
         } else {
 
             statusText.setText(
-                    "Command: " + command
+                    "Command received"
             );
 
             speak(
-                    "Command received. " + command
+                    "I heard you say " + command
             );
         }
+    }
+
+    private boolean containsAny(
+            String text,
+            String... words
+    ) {
+
+        for (String word : words) {
+
+            if (text.contains(word)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void openApp(
-        String packageName,
-        String appName
-) {
+            String packageName,
+            String appName
+    ) {
 
-    try {
-        Intent launchIntent =
-                getPackageManager()
-                        .getLaunchIntentForPackage(packageName);
+        try {
 
-        if (launchIntent != null) {
+            Intent launchIntent =
+                    getPackageManager()
+                            .getLaunchIntentForPackage(
+                                    packageName
+                            );
 
-            launchIntent.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK
-            );
+            if (launchIntent != null) {
 
-            startActivity(launchIntent);
+                launchIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                );
 
-            statusText.setText(
-                    appName + " open kar raha hoon"
-            );
+                startActivity(
+                        launchIntent
+                );
 
-            speak(appName + " opening.");
+                statusText.setText(
+                        appName +
+                        " open kar raha hoon"
+                );
 
-        } else {
+                speak(
+                        "Opening " +
+                        appName
+                );
 
-            // Fallback: open the app's website
-            Intent webIntent = new Intent(
-                    Intent.ACTION_VIEW,
-                    android.net.Uri.parse(
-                            "https://www.youtube.com"
-                    )
-            );
+                return;
+            }
 
-            startActivity(webIntent);
+            /*
+             * Agar package name se app launch nahi hota,
+             * to Android ke launcher intent ke through
+             * installed application ko search karne ki
+             * koshish karenge.
+             */
+            Intent launchApps =
+                    getPackageManager()
+                            .getLaunchIntentForPackage(
+                                    packageName
+                            );
 
-            statusText.setText(
-                    appName + " open karne ki koshish kar raha hoon"
-            );
+            if (launchApps != null) {
 
-            speak("Opening " + appName + ".");
-        }
+                startActivity(
+                        launchApps
+                );
 
-    } catch (Exception e) {
+                return;
+            }
 
-        statusText.setText(
-                "Unable to open " + appName
-        );
+            // YouTube ke liye browser fallback
+            if (appName.equals("YouTube")) {
 
-        speak(
-                "I could not open " + appName
-        );
-    }
-    } {
-
-        Intent launchIntent =
-                getPackageManager()
-                        .getLaunchIntentForPackage(
-                                packageName
+                Intent browser =
+                        new Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                        "https://www.youtube.com"
+                                )
                         );
 
-        if (launchIntent != null) {
+                startActivity(
+                        browser
+                );
 
-            startActivity(launchIntent);
+                statusText.setText(
+                        "YouTube open kar raha hoon"
+                );
+
+                speak(
+                        "Opening YouTube"
+                );
+
+                return;
+            }
 
             statusText.setText(
-                    appName + " open kar raha hoon"
+                    appName +
+                    " installed nahi mila"
             );
 
             speak(
-                    appName + " opening."
+                    appName +
+                    " was not found."
             );
 
-        } else {
+        } catch (Exception e) {
 
             statusText.setText(
-                    appName + " installed nahi hai"
+                    appName +
+                    " open nahi ho saka"
             );
 
             speak(
-                    appName + " is not installed."
+                    "I could not open " +
+                    appName
             );
         }
     }
 
     private void openSettings() {
 
-        Intent intent =
-                new Intent(Settings.ACTION_SETTINGS);
+        try {
 
-        startActivity(intent);
+            Intent intent =
+                    new Intent(
+                            Settings.ACTION_SETTINGS
+                    );
 
-        statusText.setText(
-                "Settings open kar raha hoon"
-        );
+            startActivity(
+                    intent
+            );
 
-        speak("Opening settings.");
+            statusText.setText(
+                    "Settings open kar raha hoon"
+            );
+
+            speak(
+                    "Opening settings"
+            );
+
+        } catch (Exception e) {
+
+            speak(
+                    "I could not open settings"
+            );
+        }
+    }
+
+    private void openAccessibility() {
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    );
+
+            startActivity(
+                    intent
+            );
+
+            speak(
+                    "Opening accessibility settings"
+            );
+
+        } catch (Exception e) {
+
+            speak(
+                    "I could not open accessibility settings"
+            );
+        }
     }
 
     private void speak(String text) {
@@ -285,4 +419,4 @@ public class MainActivity extends Activity {
 
         super.onDestroy();
     }
-            }
+                }
