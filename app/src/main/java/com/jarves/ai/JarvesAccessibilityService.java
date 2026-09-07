@@ -9,59 +9,43 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class JarvesAccessibilityService
-        extends AccessibilityService {
+public class JarvesAccessibilityService extends AccessibilityService {
 
     private static JarvesAccessibilityService instance;
 
     @Override
     public void onServiceConnected() {
-
         super.onServiceConnected();
-
         instance = this;
     }
 
-    @Override
-    public void onAccessibilityEvent(
-            AccessibilityEvent event) {
+    public static JarvesAccessibilityService getInstance() {
+        return instance;
+    }
 
-        // Jarves automation events
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        // Jarves screen monitoring
     }
 
     @Override
     public void onInterrupt() {
-
-        // Accessibility service interrupted
     }
 
     @Override
     public void onDestroy() {
-
         instance = null;
-
         super.onDestroy();
     }
 
-    public static boolean isRunning() {
-
-        return instance != null;
-    }
-
-    public static JarvesAccessibilityService
-    getInstance() {
-
-        return instance;
-    }
-
-    // --------------------------------------------------
-    // CLICK TEXT
-    // --------------------------------------------------
+    // ---------------- CLICK TEXT ----------------
 
     public boolean clickText(String text) {
-
-        AccessibilityNodeInfo root =
-                getRootInActiveWindow();
+        AccessibilityNodeInfo root = getRootInActiveWindow();
 
         if (root == null || text == null) {
             return false;
@@ -69,9 +53,7 @@ public class JarvesAccessibilityService
 
         return findAndClick(
                 root,
-                text.toLowerCase(
-                        Locale.ROOT
-                ).trim()
+                text.toLowerCase(Locale.ROOT).trim()
         );
     }
 
@@ -83,48 +65,35 @@ public class JarvesAccessibilityService
             return false;
         }
 
-        CharSequence nodeText =
-                node.getText();
+        CharSequence text = node.getText();
+        CharSequence description = node.getContentDescription();
 
-        CharSequence description =
-                node.getContentDescription();
-
-        if (matches(nodeText, target)
-                || matches(description, target)) {
+        if (matches(text, target) || matches(description, target)) {
 
             if (node.isClickable()) {
-
                 return node.performAction(
                         AccessibilityNodeInfo.ACTION_CLICK
                 );
             }
 
-            AccessibilityNodeInfo parent =
-                    node.getParent();
+            AccessibilityNodeInfo parent = node.getParent();
 
-            if (parent != null &&
-                    parent.isClickable()) {
-
-                return parent.performAction(
+            if (parent != null && parent.isClickable()) {
+                boolean result = parent.performAction(
                         AccessibilityNodeInfo.ACTION_CLICK
                 );
+                parent.recycle();
+                return result;
             }
         }
 
-        for (int i = 0;
-                i < node.getChildCount();
-                i++) {
+        for (int i = 0; i < node.getChildCount(); i++) {
 
-            AccessibilityNodeInfo child =
-                    node.getChild(i);
+            AccessibilityNodeInfo child = node.getChild(i);
 
             if (child != null) {
 
-                boolean result =
-                        findAndClick(
-                                child,
-                                target
-                        );
+                boolean result = findAndClick(child, target);
 
                 child.recycle();
 
@@ -141,68 +110,54 @@ public class JarvesAccessibilityService
             CharSequence value,
             String target) {
 
-        if (value == null ||
-                target == null) {
-
+        if (value == null || target == null) {
             return false;
         }
 
-        String current =
-                value.toString()
-                        .toLowerCase(
-                                Locale.ROOT
-                        )
-                        .trim();
+        String current = value.toString()
+                .toLowerCase(Locale.ROOT)
+                .trim();
 
         return current.equals(target)
                 || current.contains(target)
                 || target.contains(current);
     }
 
-    // --------------------------------------------------
-    // TYPE TEXT
-    // --------------------------------------------------
+    // ---------------- TYPE TEXT ----------------
 
     public boolean typeText(String text) {
 
-        AccessibilityNodeInfo root =
-                getRootInActiveWindow();
+        AccessibilityNodeInfo root = getRootInActiveWindow();
 
-        if (root == null ||
-                text == null) {
-
+        if (root == null || text == null) {
             return false;
         }
 
-        AccessibilityNodeInfo input =
-                findEditableField(root);
+        AccessibilityNodeInfo input = findEditableField(root);
 
         if (input == null) {
             return false;
         }
 
-        Bundle arguments =
-                new Bundle();
+        Bundle args = new Bundle();
 
-        arguments.putCharSequence(
+        args.putCharSequence(
                 AccessibilityNodeInfo
                         .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
                 text
         );
 
-        boolean result =
-                input.performAction(
-                        AccessibilityNodeInfo.ACTION_SET_TEXT,
-                        arguments
-                );
+        boolean result = input.performAction(
+                AccessibilityNodeInfo.ACTION_SET_TEXT,
+                args
+        );
 
         input.recycle();
 
         return result;
     }
 
-    private AccessibilityNodeInfo
-    findEditableField(
+    private AccessibilityNodeInfo findEditableField(
             AccessibilityNodeInfo node) {
 
         if (node == null) {
@@ -210,18 +165,12 @@ public class JarvesAccessibilityService
         }
 
         if (node.isEditable()) {
-
-            return AccessibilityNodeInfo.obtain(
-                    node
-            );
+            return AccessibilityNodeInfo.obtain(node);
         }
 
-        for (int i = 0;
-                i < node.getChildCount();
-                i++) {
+        for (int i = 0; i < node.getChildCount(); i++) {
 
-            AccessibilityNodeInfo child =
-                    node.getChild(i);
+            AccessibilityNodeInfo child = node.getChild(i);
 
             if (child != null) {
 
@@ -239,89 +188,126 @@ public class JarvesAccessibilityService
         return null;
     }
 
-    // --------------------------------------------------
-    // FOCUS EDITABLE FIELD
-    // --------------------------------------------------
+    // ---------------- FOCUS EDITABLE FIELD ----------------
 
     public boolean focusEditableField() {
 
-        AccessibilityNodeInfo root =
-                getRootInActiveWindow();
+        AccessibilityNodeInfo root = getRootInActiveWindow();
 
         if (root == null) {
             return false;
         }
 
-        AccessibilityNodeInfo input =
-                findEditableField(root);
+        AccessibilityNodeInfo input = findEditableField(root);
 
         if (input == null) {
             return false;
         }
 
-        boolean result =
-                input.performAction(
-                        AccessibilityNodeInfo.ACTION_FOCUS
-                );
+        boolean result = input.performAction(
+                AccessibilityNodeInfo.ACTION_FOCUS
+        );
 
         input.recycle();
 
         return result;
     }
 
-    // --------------------------------------------------
-    // HOME
-    // --------------------------------------------------
+    // ---------------- HOME ----------------
 
     public boolean goHome() {
-
-        return performGlobalAction(
-                GLOBAL_ACTION_HOME
-        );
+        return performGlobalAction(GLOBAL_ACTION_HOME);
     }
 
-    // --------------------------------------------------
-    // BACK
-    // --------------------------------------------------
+    // ---------------- BACK ----------------
 
     public boolean globalBack() {
-
-        return performGlobalAction(
-                GLOBAL_ACTION_BACK
-        );
+        return performGlobalAction(GLOBAL_ACTION_BACK);
     }
 
-    // --------------------------------------------------
-    // RECENT APPS
-    // --------------------------------------------------
+    // ---------------- RECENTS ----------------
 
     public boolean openRecents() {
+        return performGlobalAction(GLOBAL_ACTION_RECENTS);
+    }
 
-        return performGlobalAction(
-                GLOBAL_ACTION_RECENTS
+    // ---------------- SCROLL FORWARD ----------------
+
+    public boolean scrollForward() {
+
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+
+        if (root == null) {
+            return false;
+        }
+
+        return performScroll(
+                root,
+                AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
         );
     }
 
-    // --------------------------------------------------
-    // GET VISIBLE TEXT
-    // --------------------------------------------------
+    // ---------------- SCROLL BACKWARD ----------------
+
+    public boolean scrollBackward() {
+
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+
+        if (root == null) {
+            return false;
+        }
+
+        return performScroll(
+                root,
+                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+        );
+    }
+
+    private boolean performScroll(
+            AccessibilityNodeInfo node,
+            int action) {
+
+        if (node == null) {
+            return false;
+        }
+
+        if (node.isScrollable()) {
+
+            if (node.performAction(action)) {
+                return true;
+            }
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+
+            AccessibilityNodeInfo child = node.getChild(i);
+
+            if (child != null) {
+
+                boolean result = performScroll(child, action);
+
+                child.recycle();
+
+                if (result) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // ---------------- VISIBLE TEXT ----------------
 
     public List<String> getVisibleTexts() {
 
-        List<String> result =
-                new ArrayList<>();
+        List<String> result = new ArrayList<>();
 
-        AccessibilityNodeInfo root =
-                getRootInActiveWindow();
+        AccessibilityNodeInfo root = getRootInActiveWindow();
 
-        if (root == null) {
-            return result;
+        if (root != null) {
+            collectTexts(root, result);
         }
-
-        collectTexts(
-                root,
-                result
-        );
 
         return result;
     }
@@ -334,15 +320,10 @@ public class JarvesAccessibilityService
             return;
         }
 
-        CharSequence text =
-                node.getText();
+        CharSequence text = node.getText();
 
-        if (text != null &&
-                text.length() > 0) {
-
-            result.add(
-                    text.toString()
-            );
+        if (text != null && text.length() > 0) {
+            result.add(text.toString());
         }
 
         CharSequence description =
@@ -351,27 +332,19 @@ public class JarvesAccessibilityService
         if (description != null &&
                 description.length() > 0) {
 
-            result.add(
-                    description.toString()
-            );
+            result.add(description.toString());
         }
 
-        for (int i = 0;
-                i < node.getChildCount();
-                i++) {
+        for (int i = 0; i < node.getChildCount(); i++) {
 
-            AccessibilityNodeInfo child =
-                    node.getChild(i);
+            AccessibilityNodeInfo child = node.getChild(i);
 
             if (child != null) {
 
-                collectTexts(
-                        child,
-                        result
-                );
+                collectTexts(child, result);
 
                 child.recycle();
             }
         }
     }
-            }
+}
