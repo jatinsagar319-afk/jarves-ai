@@ -9,34 +9,49 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class JarvesAccessibilityService extends AccessibilityService {
+public class JarvesAccessibilityService
+        extends AccessibilityService {
 
     private static JarvesAccessibilityService instance;
 
     @Override
     public void onServiceConnected() {
+
         super.onServiceConnected();
+
         instance = this;
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
+    public void onAccessibilityEvent(
+            AccessibilityEvent event) {
+
         // Jarves automation events
     }
 
     @Override
     public void onInterrupt() {
+
         // Accessibility service interrupted
     }
 
     @Override
     public void onDestroy() {
+
         instance = null;
+
         super.onDestroy();
     }
 
     public static boolean isRunning() {
+
         return instance != null;
+    }
+
+    public static JarvesAccessibilityService
+    getInstance() {
+
+        return instance;
     }
 
     // --------------------------------------------------
@@ -54,7 +69,9 @@ public class JarvesAccessibilityService extends AccessibilityService {
 
         return findAndClick(
                 root,
-                text.toLowerCase(Locale.ROOT).trim()
+                text.toLowerCase(
+                        Locale.ROOT
+                ).trim()
         );
     }
 
@@ -95,8 +112,8 @@ public class JarvesAccessibilityService extends AccessibilityService {
         }
 
         for (int i = 0;
-             i < node.getChildCount();
-             i++) {
+                i < node.getChildCount();
+                i++) {
 
             AccessibilityNodeInfo child =
                     node.getChild(i);
@@ -132,7 +149,9 @@ public class JarvesAccessibilityService extends AccessibilityService {
 
         String current =
                 value.toString()
-                        .toLowerCase(Locale.ROOT)
+                        .toLowerCase(
+                                Locale.ROOT
+                        )
                         .trim();
 
         return current.equals(target)
@@ -149,7 +168,9 @@ public class JarvesAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo root =
                 getRootInActiveWindow();
 
-        if (root == null || text == null) {
+        if (root == null ||
+                text == null) {
+
             return false;
         }
 
@@ -180,7 +201,8 @@ public class JarvesAccessibilityService extends AccessibilityService {
         return result;
     }
 
-    private AccessibilityNodeInfo findEditableField(
+    private AccessibilityNodeInfo
+    findEditableField(
             AccessibilityNodeInfo node) {
 
         if (node == null) {
@@ -195,8 +217,8 @@ public class JarvesAccessibilityService extends AccessibilityService {
         }
 
         for (int i = 0;
-             i < node.getChildCount();
-             i++) {
+                i < node.getChildCount();
+                i++) {
 
             AccessibilityNodeInfo child =
                     node.getChild(i);
@@ -248,17 +270,6 @@ public class JarvesAccessibilityService extends AccessibilityService {
     }
 
     // --------------------------------------------------
-    // GLOBAL BACK
-    // --------------------------------------------------
-
-    public boolean globalBack() {
-
-        return performGlobalAction(
-                GLOBAL_ACTION_BACK
-        );
-    }
-
-    // --------------------------------------------------
     // HOME
     // --------------------------------------------------
 
@@ -270,7 +281,18 @@ public class JarvesAccessibilityService extends AccessibilityService {
     }
 
     // --------------------------------------------------
-    // RECENTS
+    // BACK
+    // --------------------------------------------------
+
+    public boolean globalBack() {
+
+        return performGlobalAction(
+                GLOBAL_ACTION_BACK
+        );
+    }
+
+    // --------------------------------------------------
+    // RECENT APPS
     // --------------------------------------------------
 
     public boolean openRecents() {
@@ -335,8 +357,8 @@ public class JarvesAccessibilityService extends AccessibilityService {
         }
 
         for (int i = 0;
-             i < node.getChildCount();
-             i++) {
+                i < node.getChildCount();
+                i++) {
 
             AccessibilityNodeInfo child =
                     node.getChild(i);
@@ -352,4 +374,4 @@ public class JarvesAccessibilityService extends AccessibilityService {
             }
         }
     }
-    }
+            }
