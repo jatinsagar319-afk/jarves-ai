@@ -1,7 +1,6 @@
 package com.jarves.ai;
 
 import android.accessibilityservice.AccessibilityService;
-import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -22,11 +21,12 @@ public class JarvesAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Future Jarves automation events.
+        // Jarves automation events
     }
 
     @Override
     public void onInterrupt() {
+        // Accessibility service interrupted
     }
 
     @Override
@@ -39,14 +39,23 @@ public class JarvesAccessibilityService extends AccessibilityService {
         return instance != null;
     }
 
+    // --------------------------------------------------
+    // CLICK TEXT
+    // --------------------------------------------------
+
     public boolean clickText(String text) {
-        AccessibilityNodeInfo root = getRootInActiveWindow();
+
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow();
 
         if (root == null || text == null) {
             return false;
         }
 
-        return findAndClick(root, text.toLowerCase(Locale.ROOT));
+        return findAndClick(
+                root,
+                text.toLowerCase(Locale.ROOT).trim()
+        );
     }
 
     private boolean findAndClick(
@@ -57,13 +66,17 @@ public class JarvesAccessibilityService extends AccessibilityService {
             return false;
         }
 
-        CharSequence text = node.getText();
-        CharSequence description = node.getContentDescription();
+        CharSequence nodeText =
+                node.getText();
 
-        if (matches(text, target) ||
-                matches(description, target)) {
+        CharSequence description =
+                node.getContentDescription();
+
+        if (matches(nodeText, target)
+                || matches(description, target)) {
 
             if (node.isClickable()) {
+
                 return node.performAction(
                         AccessibilityNodeInfo.ACTION_CLICK
                 );
@@ -81,19 +94,26 @@ public class JarvesAccessibilityService extends AccessibilityService {
             }
         }
 
-        for (int i = 0; i < node.getChildCount(); i++) {
+        for (int i = 0;
+             i < node.getChildCount();
+             i++) {
 
             AccessibilityNodeInfo child =
                     node.getChild(i);
 
             if (child != null) {
 
-                if (findAndClick(child, target)) {
-                    child.recycle();
-                    return true;
-                }
+                boolean result =
+                        findAndClick(
+                                child,
+                                target
+                        );
 
                 child.recycle();
+
+                if (result) {
+                    return true;
+                }
             }
         }
 
@@ -104,7 +124,9 @@ public class JarvesAccessibilityService extends AccessibilityService {
             CharSequence value,
             String target) {
 
-        if (value == null) {
+        if (value == null ||
+                target == null) {
+
             return false;
         }
 
@@ -117,6 +139,10 @@ public class JarvesAccessibilityService extends AccessibilityService {
                 || current.contains(target)
                 || target.contains(current);
     }
+
+    // --------------------------------------------------
+    // TYPE TEXT
+    // --------------------------------------------------
 
     public boolean typeText(String text) {
 
@@ -134,10 +160,12 @@ public class JarvesAccessibilityService extends AccessibilityService {
             return false;
         }
 
-        Bundle arguments = new Bundle();
+        Bundle arguments =
+                new Bundle();
 
         arguments.putCharSequence(
-                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                AccessibilityNodeInfo
+                        .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
                 text
         );
 
@@ -160,10 +188,15 @@ public class JarvesAccessibilityService extends AccessibilityService {
         }
 
         if (node.isEditable()) {
-            return AccessibilityNodeInfo.obtain(node);
+
+            return AccessibilityNodeInfo.obtain(
+                    node
+            );
         }
 
-        for (int i = 0; i < node.getChildCount(); i++) {
+        for (int i = 0;
+             i < node.getChildCount();
+             i++) {
 
             AccessibilityNodeInfo child =
                     node.getChild(i);
@@ -184,7 +217,11 @@ public class JarvesAccessibilityService extends AccessibilityService {
         return null;
     }
 
-    public boolean pressEnter() {
+    // --------------------------------------------------
+    // FOCUS EDITABLE FIELD
+    // --------------------------------------------------
+
+    public boolean focusEditableField() {
 
         AccessibilityNodeInfo root =
                 getRootInActiveWindow();
@@ -202,7 +239,7 @@ public class JarvesAccessibilityService extends AccessibilityService {
 
         boolean result =
                 input.performAction(
-                        AccessibilityNodeInfo.ACTION_IME_ENTER
+                        AccessibilityNodeInfo.ACTION_FOCUS
                 );
 
         input.recycle();
@@ -210,48 +247,42 @@ public class JarvesAccessibilityService extends AccessibilityService {
         return result;
     }
 
+    // --------------------------------------------------
+    // GLOBAL BACK
+    // --------------------------------------------------
+
     public boolean globalBack() {
+
         return performGlobalAction(
                 GLOBAL_ACTION_BACK
         );
     }
 
+    // --------------------------------------------------
+    // HOME
+    // --------------------------------------------------
+
     public boolean goHome() {
+
         return performGlobalAction(
                 GLOBAL_ACTION_HOME
         );
     }
 
+    // --------------------------------------------------
+    // RECENTS
+    // --------------------------------------------------
+
     public boolean openRecents() {
+
         return performGlobalAction(
                 GLOBAL_ACTION_RECENTS
         );
     }
 
-    public boolean takeScreenshotIfSupported() {
-
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            takeScreenshot(
-                    AccessibilityService.SCREENSHOT_HARDWARE_BITMAP,
-                    getMainExecutor(),
-                    new TakeScreenshotCallback() {
-                        @Override
-                        public void onSuccess(
-                                ScreenshotResult result) {
-                        }
-
-                        @Override
-                        public void onFailure(
-                                int errorCode) {
-                        }
-                    }
-            );
-
-            return true;
-        }
-
-        return false;
-    }
+    // --------------------------------------------------
+    // GET VISIBLE TEXT
+    // --------------------------------------------------
 
     public List<String> getVisibleTexts() {
 
@@ -265,7 +296,10 @@ public class JarvesAccessibilityService extends AccessibilityService {
             return result;
         }
 
-        collectTexts(root, result);
+        collectTexts(
+                root,
+                result
+        );
 
         return result;
     }
@@ -278,12 +312,15 @@ public class JarvesAccessibilityService extends AccessibilityService {
             return;
         }
 
-        CharSequence text = node.getText();
+        CharSequence text =
+                node.getText();
 
         if (text != null &&
                 text.length() > 0) {
 
-            result.add(text.toString());
+            result.add(
+                    text.toString()
+            );
         }
 
         CharSequence description =
@@ -297,15 +334,22 @@ public class JarvesAccessibilityService extends AccessibilityService {
             );
         }
 
-        for (int i = 0; i < node.getChildCount(); i++) {
+        for (int i = 0;
+             i < node.getChildCount();
+             i++) {
 
             AccessibilityNodeInfo child =
                     node.getChild(i);
 
             if (child != null) {
-                collectTexts(child, result);
+
+                collectTexts(
+                        child,
+                        result
+                );
+
                 child.recycle();
             }
         }
     }
-}
+    }
