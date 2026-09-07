@@ -1,17 +1,23 @@
+```java
 package com.jarves.ai;
 
 import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
 import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.RecognitionListener;
 import android.speech.tts.TextToSpeech;
 import android.provider.Settings;
 import android.net.Uri;
-import android.widget.Button;
-import android.widget.TextView;
+import android.os.Bundle;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,41 +44,68 @@ public class MainActivity extends Activity {
         Button accessibilityButton =
                 findViewById(R.id.accessibilityButton);
 
-        jarvesVoice = new TextToSpeech(this, result -> {
+        // ---------------- TTS ----------------
 
-            if (result == TextToSpeech.SUCCESS) {
+        jarvesVoice = new TextToSpeech(
+                this,
+                new TextToSpeech.OnInitListener() {
+                    @Override
+                    public void onInit(int status) {
 
-                int languageResult =
-                        jarvesVoice.setLanguage(Locale.getDefault());
+                        if (status == TextToSpeech.SUCCESS) {
 
-                if (languageResult ==
-                        TextToSpeech.LANG_MISSING_DATA ||
-                        languageResult ==
-                        TextToSpeech.LANG_NOT_SUPPORTED) {
+                            jarvesVoice.setLanguage(
+                                    Locale.ENGLISH
+                            );
 
-                    jarvesVoice.setLanguage(Locale.US);
+                            jarvesVoice.setSpeechRate(0.95f);
+                        }
+                    }
                 }
-            }
-        });
-
-        voiceButton.setOnClickListener(v -> startListening());
-
-        accessibilityButton.setOnClickListener(
-                v -> openAccessibility()
         );
 
-        statusText.setText("Jarves ready");
+        // ---------------- VOICE BUTTON ----------------
+
+        voiceButton.setOnClickListener(v -> {
+            startListening();
+        });
+
+        // ---------------- ACCESSIBILITY BUTTON ----------------
+
+        accessibilityButton.setOnClickListener(v -> {
+            openAccessibility();
+        });
+
+        statusText.setText(
+                "Jarves ready. Voice command bolo."
+        );
     }
 
-    // ==================================================
+    // =========================================================
     // VOICE LISTENING
-    // ==================================================
+    // =========================================================
 
     private void startListening() {
 
-        Intent intent = new Intent(
-                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-        );
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+
+            Toast.makeText(
+                    this,
+                    "Speech recognition available nahi hai",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            speak(
+                    "Speech recognition is not available."
+            );
+
+            return;
+        }
+
+        Intent intent =
+                new Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                );
 
         intent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -86,7 +119,7 @@ public class MainActivity extends Activity {
 
         intent.putExtra(
                 RecognizerIntent.EXTRA_PROMPT,
-                "Jarves ko command dijiye"
+                "Jarves ko command bolo"
         );
 
         try {
@@ -98,15 +131,21 @@ public class MainActivity extends Activity {
 
         } catch (Exception e) {
 
-            statusText.setText(
-                    "Voice recognition available nahi hai."
-            );
+            Toast.makeText(
+                    this,
+                    "Voice input start nahi ho saka",
+                    Toast.LENGTH_SHORT
+            ).show();
 
             speak(
-                    "Voice recognition is not available."
+                    "Voice input could not be started."
             );
         }
     }
+
+    // =========================================================
+    // VOICE RESULT
+    // =========================================================
 
     @Override
     protected void onActivityResult(
@@ -120,403 +159,504 @@ public class MainActivity extends Activity {
                 data
         );
 
-        if (requestCode == VOICE_REQUEST
-                && resultCode == RESULT_OK
-                && data != null) {
-
-            ArrayList<String> results =
-                    data.getStringArrayListExtra(
-                            RecognizerIntent.EXTRA_RESULTS
-                    );
-
-            if (results != null &&
-                    !results.isEmpty()) {
-
-                String command =
-                        results.get(0).trim();
-
-                commandText.setText(command);
-
-                executeCommand(command);
-            }
+        if (requestCode != VOICE_REQUEST) {
+            return;
         }
-    }
 
-    // ==================================================
-    // COMMAND ENGINE
-    // ==================================================
+        if (resultCode != RESULT_OK || data == null) {
 
-    private void executeCommand(String command) {
-
-        if (command == null ||
-                command.trim().isEmpty()) {
+            statusText.setText(
+                    "Voice command nahi mili."
+            );
 
             return;
         }
 
+        ArrayList<String> results =
+                data.getStringArrayListExtra(
+                        RecognizerIntent.EXTRA_RESULTS
+                );
+
+        if (results == null || results.isEmpty()) {
+
+            statusText.setText(
+                    "Command samajh nahi aayi."
+            );
+
+            speak(
+                    "I could not understand the command."
+            );
+
+            return;
+        }
+
+        String command =
+                results.get(0);
+
+        if (command == null) {
+            return;
+        }
+
+        command = command.trim();
+
+        commandText.setText(
+                command
+        );
+
+        executeCommand(command);
+    }
+
+    // =========================================================
+    // COMMAND EXECUTION
+    // =========================================================
+
+    private void executeCommand(String command) {
+
+        if (command == null) {
+            return;
+        }
+
+        String originalCommand =
+                command.trim();
+
         String cmd =
-                command.toLowerCase(Locale.ROOT).trim();
+                originalCommand
+                        .toLowerCase(Locale.ROOT)
+                        .trim();
 
-        // Remove Jarves/Jarvis from command
-        cmd = cmd.replace("jarves", " ");
-        cmd = cmd.replace("jarvis", " ");
-        cmd = cmd.trim();
+        if (cmd.length() == 0) {
+            return;
+        }
 
-        // ---------------- HOME ----------------
+        // -----------------------------------------------------
+        // HOME
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "home",
                 "go home",
+                "open home",
                 "ghar",
-                "ghar jao",
-                "home jao",
-                "home par jao"
+                "home screen",
+                "home page"
         )) {
 
             performHome();
+
             return;
         }
 
-        // ---------------- BACK ----------------
+        // -----------------------------------------------------
+        // BACK
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "back",
                 "go back",
-                "peeche",
                 "piche",
+                "peeche",
                 "wapas",
-                "wapas jao",
-                "back jao"
+                "go previous"
         )) {
 
             performBack();
+
             return;
         }
 
-        // ---------------- RECENTS ----------------
+        // -----------------------------------------------------
+        // RECENTS
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "recent",
+                "recents",
                 "recent apps",
-                "recent app",
-                "recent kholo",
-                "recent apps kholo"
+                "open recent",
+                "recent application"
         )) {
 
             performRecents();
+
             return;
         }
 
-        // ---------------- SETTINGS ----------------
+        // -----------------------------------------------------
+        // SETTINGS
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "settings",
-                "setting",
-                "सेटिंग",
-                "सेटिंग्स"
+                "open settings",
+                "setting kholo",
+                "settings kholo"
         )) {
 
             openSettings();
+
             return;
         }
 
-        // ---------------- ACCESSIBILITY ----------------
+        // -----------------------------------------------------
+        // ACCESSIBILITY
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "accessibility",
-                "accessibility settings",
-                "phone control"
+                "open accessibility",
+                "accessibility kholo"
         )) {
 
             openAccessibility();
+
             return;
         }
 
-        // ---------------- SCROLL DOWN ----------------
+        // -----------------------------------------------------
+        // SCROLL DOWN
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "scroll down",
-                "scroll neeche",
+                "scroll downward",
                 "neeche scroll",
-                "neeche scroll karo",
                 "niche scroll",
-                "niche scroll karo",
+                "scroll neeche",
+                "scroll niche",
                 "down scroll"
         )) {
 
             performScrollDown();
+
             return;
         }
 
-        // ---------------- SCROLL UP ----------------
+        // -----------------------------------------------------
+        // SCROLL UP
+        // -----------------------------------------------------
 
         if (containsAny(
                 cmd,
                 "scroll up",
-                "scroll upar",
+                "scroll upward",
                 "upar scroll",
-                "upar scroll karo",
+                "ऊपर scroll",
+                "scroll upar",
                 "up scroll"
         )) {
 
             performScrollUp();
+
             return;
         }
 
-        // ---------------- CLICK COMMAND ----------------
+        // -----------------------------------------------------
+        // CLICK COMMAND
+        // -----------------------------------------------------
 
-        if (containsAny(
-                cmd,
-                "click",
-                "click karo",
-                "dabao",
-                "daba do",
-                "open button",
-                "button dabao",
-                "par click karo"
-        )) {
+        if (cmd.startsWith("click ")
+                || cmd.startsWith("click on ")
+                || cmd.startsWith("press ")
+                || cmd.startsWith("tap ")
+                || cmd.startsWith("open button ")) {
 
             String target =
-                    extractClickTarget(cmd);
+                    extractClickTarget(
+                            originalCommand
+                    );
 
-            if (!target.isEmpty()) {
+            if (target.length() > 0) {
 
                 performClick(target);
 
-                return;
+            } else {
+
+                speak(
+                        "Please tell me what to click."
+                );
             }
-        }
 
-        // ---------------- TYPE COMMAND ----------------
-
-        if (containsAny(
-                cmd,
-                "type",
-                "type karo",
-                "likho",
-                "likh do",
-                "enter karo",
-                "text likho"
-        )) {
-
-            String text =
-                    extractTypeText(cmd);
-
-            if (!text.isEmpty()) {
-
-                performType(text);
-
-                return;
-            }
-        }
-
-        // ---------------- OPEN APP ----------------
-
-        String appName =
-                extractAppName(cmd);
-
-        if (!appName.isEmpty()) {
-
-            openInstalledApp(appName);
             return;
         }
 
+        // -----------------------------------------------------
+        // TYPE COMMAND
+        // -----------------------------------------------------
+
+        if (cmd.startsWith("type ")
+                || cmd.startsWith("type text ")
+                || cmd.startsWith("enter ")
+                || cmd.startsWith("write ")
+                || cmd.startsWith("likho ")) {
+
+            String text =
+                    extractTypeText(
+                            originalCommand
+                    );
+
+            if (text.length() > 0) {
+
+                performType(text);
+
+            } else {
+
+                speak(
+                        "Please tell me what I should type."
+                );
+            }
+
+            return;
+        }
+
+        // -----------------------------------------------------
+        // CLEAR / DELETE TEXT
+        // -----------------------------------------------------
+
+        if (containsAny(
+                cmd,
+                "clear text",
+                "delete text",
+                "remove text",
+                "text clear karo",
+                "text delete karo"
+        )) {
+
+            clearEditableText();
+
+            return;
+        }
+
+        // -----------------------------------------------------
+        // READ SCREEN
+        // -----------------------------------------------------
+
+        if (containsAny(
+                cmd,
+                "read screen",
+                "screen read karo",
+                "screen padho",
+                "what is on screen",
+                "screen par kya hai",
+                "screen pe kya hai"
+        )) {
+
+            readScreen();
+
+            return;
+        }
+
+        // -----------------------------------------------------
+        // CHECK ACCESSIBILITY
+        // -----------------------------------------------------
+
+        if (containsAny(
+                cmd,
+                "accessibility status",
+                "is accessibility running",
+                "accessibility check"
+        )) {
+
+            if (JarvesAccessibilityService.isRunning()) {
+
+                statusText.setText(
+                        "Accessibility service ON hai."
+                );
+
+                speak(
+                        "Accessibility service is running."
+                );
+
+            } else {
+
+                statusText.setText(
+                        "Accessibility service OFF hai."
+                );
+
+                speak(
+                        "Please enable Jarves accessibility service."
+                );
+            }
+
+            return;
+        }
+
+        // -----------------------------------------------------
+        // OPEN APP
+        // -----------------------------------------------------
+
+        String appName =
+                extractAppName(
+                        originalCommand
+                );
+
+        if (appName.length() > 0) {
+
+            openInstalledApp(appName);
+
+            return;
+        }
+
+        // -----------------------------------------------------
+        // UNKNOWN COMMAND
+        // -----------------------------------------------------
+
         statusText.setText(
-                "Command received: " + command
+                "Command: " + originalCommand
         );
 
         speak(
-                "Command received."
+                "Command samajh nahi aayi."
         );
     }
 
-    // ==================================================
-    // CLICK TARGET EXTRACTION
-    // ==================================================
+    // =========================================================
+    // HOME
+    // =========================================================
 
-    private String extractClickTarget(String command) {
+    private void performHome() {
 
-        String target = command;
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
 
-        String[] removeWords = {
+        if (service != null) {
 
-                "jarves",
-                "jarvis",
+            boolean result =
+                    service.goHome();
 
-                "click",
-                "click karo",
-                "click kar",
-                "dabao",
-                "daba do",
-                "button",
-                "par",
-                "pe",
-                "ko"
-        };
+            if (result) {
 
-        for (String word : removeWords) {
+                statusText.setText(
+                        "Home open kar raha hoon"
+                );
 
-            target = target.replace(
-                    word,
-                    " "
-            );
+                speak(
+                        "Opening home."
+                );
+
+                return;
+            }
         }
 
-        return target.trim();
-    }
+        try {
 
-    // ==================================================
-    // TYPE TEXT EXTRACTION
-    // ==================================================
+            Intent homeIntent =
+                    new Intent(
+                            Intent.ACTION_MAIN
+                    );
 
-    private String extractTypeText(String command) {
+            homeIntent.addCategory(
+                    Intent.CATEGORY_HOME
+            );
 
-        String text = command;
+            homeIntent.setFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+            );
 
-        String[] removeWords = {
+            startActivity(homeIntent);
 
-                "jarves",
-                "jarvis",
+            statusText.setText(
+                    "Home open kar raha hoon"
+            );
 
-                "type",
-                "type karo",
-                "type kar",
-                "likho",
-                "likh do",
-                "enter karo",
-                "text",
-                "mein",
-                "me",
-                "karo"
-        };
+            speak(
+                    "Opening home."
+            );
 
-        for (String word : removeWords) {
+        } catch (Exception e) {
 
-            text = text.replace(
-                    word,
-                    " "
+            speak(
+                    "I could not open home."
             );
         }
-
-        return text.trim();
     }
 
-    // ==================================================
-    // CLICK SCREEN TEXT
-    // ==================================================
+    // =========================================================
+    // BACK
+    // =========================================================
 
-    private void performClick(String target) {
+    private void performBack() {
 
         JarvesAccessibilityService service =
                 JarvesAccessibilityService.getInstance();
 
         if (service == null) {
 
-            statusText.setText(
-                    "Accessibility service active nahi hai."
-            );
-
             speak(
-                    "Phone control service is not active."
+                    "Please enable Jarves accessibility service."
             );
 
             return;
         }
 
         boolean result =
-                service.clickText(target);
+                service.globalBack();
 
         if (result) {
 
             statusText.setText(
-                    target + " par click kar diya"
+                    "Back"
             );
 
             speak(
-                    "Clicked " + target
+                    "Going back."
             );
 
         } else {
 
-            statusText.setText(
-                    target + " screen par nahi mila"
-            );
-
             speak(
-                    "I could not find " + target
+                    "Back action failed."
             );
         }
     }
 
-    // ==================================================
-    // TYPE TEXT
-    // ==================================================
+    // =========================================================
+    // RECENTS
+    // =========================================================
 
-    private void performType(String text) {
+    private void performRecents() {
 
         JarvesAccessibilityService service =
                 JarvesAccessibilityService.getInstance();
 
         if (service == null) {
 
-            statusText.setText(
-                    "Accessibility service active nahi hai."
-            );
-
             speak(
-                    "Phone control service is not active."
+                    "Please enable Jarves accessibility service."
             );
 
             return;
         }
 
-        boolean focused =
-                service.focusEditableField();
+        boolean result =
+                service.openRecents();
 
-        boolean typed =
-                service.typeText(text);
-
-        if (focused && typed) {
+        if (result) {
 
             statusText.setText(
-                    "Text type kar diya: " + text
+                    "Recent apps open kar raha hoon"
             );
 
             speak(
-                    "Text typed."
-            );
-
-        } else if (typed) {
-
-            statusText.setText(
-                    "Text type kar diya: " + text
-            );
-
-            speak(
-                    "Text typed."
+                    "Opening recent apps."
             );
 
         } else {
 
-            statusText.setText(
-                    "Text field nahi mila."
-            );
-
             speak(
-                    "I could not find a text field."
+                    "I could not open recent apps."
             );
         }
     }
 
-    // ==================================================
+    // =========================================================
     // SCROLL DOWN
-    // ==================================================
+    // =========================================================
 
     private void performScrollDown() {
 
@@ -526,16 +666,19 @@ public class MainActivity extends Activity {
         if (service == null) {
 
             speak(
-                    "Phone control service is not active."
+                    "Please enable Jarves accessibility service."
             );
 
             return;
         }
 
-        if (service.scrollForward()) {
+        boolean result =
+                service.scrollForward();
+
+        if (result) {
 
             statusText.setText(
-                    "Neeche scroll kar raha hoon"
+                    "Scrolling down"
             );
 
             speak(
@@ -554,9 +697,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ==================================================
+    // =========================================================
     // SCROLL UP
-    // ==================================================
+    // =========================================================
 
     private void performScrollUp() {
 
@@ -566,16 +709,19 @@ public class MainActivity extends Activity {
         if (service == null) {
 
             speak(
-                    "Phone control service is not active."
+                    "Please enable Jarves accessibility service."
             );
 
             return;
         }
 
-        if (service.scrollBackward()) {
+        boolean result =
+                service.scrollBackward();
+
+        if (result) {
 
             statusText.setText(
-                    "Upar scroll kar raha hoon"
+                    "Scrolling up"
             );
 
             speak(
@@ -594,157 +740,443 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ==================================================
-    // HOME
-    // ==================================================
+    // =========================================================
+    // CLICK
+    // =========================================================
 
-    private void performHome() {
+    private String extractClickTarget(
+            String command) {
 
-        JarvesAccessibilityService service =
-                JarvesAccessibilityService.getInstance();
-
-        if (service != null) {
-
-            if (service.goHome()) {
-
-                statusText.setText(
-                        "Home par ja raha hoon"
-                );
-
-                speak(
-                        "Going home."
-                );
-
-            } else {
-
-                speak(
-                        "I could not go home."
-                );
-            }
-
-        } else {
-
-            speak(
-                    "Phone control service is not active."
-            );
+        if (command == null) {
+            return "";
         }
-    }
 
-    // ==================================================
-    // BACK
-    // ==================================================
+        String result =
+                command.trim();
 
-    private void performBack() {
-
-        JarvesAccessibilityService service =
-                JarvesAccessibilityService.getInstance();
-
-        if (service != null) {
-
-            if (service.globalBack()) {
-
-                statusText.setText(
-                        "Back ja raha hoon"
+        String lower =
+                result.toLowerCase(
+                        Locale.ROOT
                 );
 
-                speak(
-                        "Going back."
-                );
+        String[] prefixes = {
 
-            } else {
-
-                speak(
-                        "I could not go back."
-                );
-            }
-
-        } else {
-
-            speak(
-                    "Phone control service is not active."
-            );
-        }
-    }
-
-    // ==================================================
-    // RECENTS
-    // ==================================================
-
-    private void performRecents() {
-
-        JarvesAccessibilityService service =
-                JarvesAccessibilityService.getInstance();
-
-        if (service != null) {
-
-            if (service.openRecents()) {
-
-                statusText.setText(
-                        "Recent apps open kar raha hoon"
-                );
-
-                speak(
-                        "Opening recent apps."
-                );
-
-            } else {
-
-                speak(
-                        "I could not open recent apps."
-                );
-            }
-
-        } else {
-
-            speak(
-                    "Phone control service is not active."
-            );
-        }
-    }
-
-    // ==================================================
-    // APP NAME EXTRACTION
-    // ==================================================
-
-    private String extractAppName(String command) {
-
-        String name = command;
-
-        String[] removeWords = {
-
-                "open",
-                "launch",
-                "start",
-                "run",
-
-                "khol",
-                "kholo",
-                "khol do",
-
-                "chalao",
-                "chala",
-
-                "app",
-                "application",
-
-                "jarves",
-                "jarvis"
+                "click on ",
+                "click ",
+                "press ",
+                "tap ",
+                "open button "
         };
 
-        for (String word : removeWords) {
+        for (String prefix : prefixes) {
 
-            name = name.replace(
-                    word,
-                    " "
+            if (lower.startsWith(prefix)) {
+
+                return result
+                        .substring(prefix.length())
+                        .trim();
+            }
+        }
+
+        return result;
+    }
+
+    private void performClick(
+            String target) {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            statusText.setText(
+                    "Accessibility OFF"
+            );
+
+            speak(
+                    "Please enable Jarves accessibility service."
+            );
+
+            return;
+        }
+
+        boolean result =
+                service.clickText(target);
+
+        if (result) {
+
+            statusText.setText(
+                    "Clicked: " + target
+            );
+
+            speak(
+                    "Clicking " + target
+            );
+
+        } else {
+
+            statusText.setText(
+                    "Button nahi mila: " + target
+            );
+
+            speak(
+                    "I could not find " +
+                    target
+            );
+        }
+    }
+
+    // =========================================================
+    // TYPE TEXT
+    // =========================================================
+
+    private String extractTypeText(
+            String command) {
+
+        if (command == null) {
+            return "";
+        }
+
+        String result =
+                command.trim();
+
+        String lower =
+                result.toLowerCase(
+                        Locale.ROOT
+                );
+
+        String[] prefixes = {
+
+                "type text ",
+                "type ",
+                "enter ",
+                "write ",
+                "likho "
+        };
+
+        for (String prefix : prefixes) {
+
+            if (lower.startsWith(prefix)) {
+
+                return result
+                        .substring(prefix.length())
+                        .trim();
+            }
+        }
+
+        return result;
+    }
+
+    private void performType(
+            String text) {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            speak(
+                    "Please enable Jarves accessibility service."
+            );
+
+            return;
+        }
+
+        boolean focused =
+                service.focusEditableField();
+
+        boolean typed =
+                service.typeText(text);
+
+        if (typed) {
+
+            statusText.setText(
+                    "Typed: " + text
+            );
+
+            speak(
+                    "Text entered."
+            );
+
+        } else if (!focused) {
+
+            statusText.setText(
+                    "Input field nahi mila"
+            );
+
+            speak(
+                    "I could not find an input field."
+            );
+
+        } else {
+
+            statusText.setText(
+                    "Text type nahi ho saka"
+            );
+
+            speak(
+                    "I could not enter the text."
+            );
+        }
+    }
+
+    // =========================================================
+    // CLEAR EDITABLE TEXT
+    // =========================================================
+
+    private void clearEditableText() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            speak(
+                    "Please enable Jarves accessibility service."
+            );
+
+            return;
+        }
+
+        AccessibilityNodeInfo root =
+                service.getRootInActiveWindow();
+
+        if (root == null) {
+
+            speak(
+                    "I cannot access the current screen."
+            );
+
+            return;
+        }
+
+        AccessibilityNodeInfo input =
+                findEditableField(root);
+
+        if (input == null) {
+
+            speak(
+                    "I could not find a text field."
+            );
+
+            return;
+        }
+
+        android.os.Bundle args =
+                new android.os.Bundle();
+
+        args.putCharSequence(
+                AccessibilityNodeInfo
+                        .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                ""
+        );
+
+        boolean result =
+                input.performAction(
+                        AccessibilityNodeInfo.ACTION_SET_TEXT,
+                        args
+                );
+
+        input.recycle();
+
+        if (result) {
+
+            statusText.setText(
+                    "Text cleared"
+            );
+
+            speak(
+                    "Text cleared."
+            );
+
+        } else {
+
+            speak(
+                    "I could not clear the text."
+            );
+        }
+    }
+
+    private AccessibilityNodeInfo findEditableField(
+            AccessibilityNodeInfo node) {
+
+        if (node == null) {
+            return null;
+        }
+
+        if (node.isEditable()) {
+
+            return AccessibilityNodeInfo.obtain(
+                    node
             );
         }
 
-        return name.trim();
+        for (int i = 0;
+             i < node.getChildCount();
+             i++) {
+
+            AccessibilityNodeInfo child =
+                    node.getChild(i);
+
+            if (child != null) {
+
+                AccessibilityNodeInfo result =
+                        findEditableField(child);
+
+                child.recycle();
+
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+
+        return null;
     }
 
-    // ==================================================
+    // =========================================================
+    // READ SCREEN
+    // =========================================================
+
+    private void readScreen() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            speak(
+                    "Please enable Jarves accessibility service."
+            );
+
+            return;
+        }
+
+        List<String> texts =
+                service.getVisibleTexts();
+
+        if (texts == null ||
+                texts.isEmpty()) {
+
+            statusText.setText(
+                    "Screen par readable text nahi mila."
+            );
+
+            speak(
+                    "I could not find readable text on the screen."
+            );
+
+            return;
+        }
+
+        StringBuilder builder =
+                new StringBuilder();
+
+        int count = 0;
+
+        for (String text : texts) {
+
+            if (text == null ||
+                    text.trim().length() == 0) {
+                continue;
+            }
+
+            if (count > 0) {
+                builder.append(". ");
+            }
+
+            builder.append(
+                    text.trim()
+            );
+
+            count++;
+
+            if (count >= 15) {
+                break;
+            }
+        }
+
+        String screenText =
+                builder.toString();
+
+        statusText.setText(
+                screenText
+        );
+
+        speak(
+                screenText
+        );
+    }
+
+    // =========================================================
+    // EXTRACT APP NAME
+    // =========================================================
+
+    private String extractAppName(
+            String command) {
+
+        if (command == null) {
+            return "";
+        }
+
+        String result =
+                command.trim();
+
+        String lower =
+                result.toLowerCase(
+                        Locale.ROOT
+                );
+
+        String[] prefixes = {
+
+                "open ",
+                "launch ",
+                "start ",
+                "run ",
+                "khol ",
+                "kholo ",
+                "chalao ",
+                "chala ",
+                "app open ",
+                "application open "
+        };
+
+        for (String prefix : prefixes) {
+
+            if (lower.startsWith(prefix)) {
+
+                return result
+                        .substring(prefix.length())
+                        .trim();
+            }
+        }
+
+        // If user simply says an app name
+        if (!containsAny(
+                lower,
+                "what",
+                "who",
+                "how",
+                "why",
+                "please",
+                "tell me",
+                "read",
+                "click",
+                "press",
+                "tap",
+                "type",
+                "scroll"
+        )) {
+
+            return result;
+        }
+
+        return "";
+    }
+
+    // =========================================================
     // OPEN INSTALLED APP
-    // ==================================================
+    // =========================================================
 
     private void openInstalledApp(
             String requestedName) {
@@ -769,9 +1201,15 @@ public class MainActivity extends Activity {
                 );
 
         String searchName =
-                requestedName.toLowerCase(
-                        Locale.ROOT
-                ).trim();
+                requestedName
+                        .toLowerCase(
+                                Locale.ROOT
+                        )
+                        .trim();
+
+        // -----------------------------------------------------
+        // Search installed launcher apps
+        // -----------------------------------------------------
 
         for (ResolveInfo info : apps) {
 
@@ -817,7 +1255,9 @@ public class MainActivity extends Activity {
             }
         }
 
+        // -----------------------------------------------------
         // Common apps
+        // -----------------------------------------------------
 
         String packageName =
                 findCommonAppPackage(
@@ -852,7 +1292,9 @@ public class MainActivity extends Activity {
             }
         }
 
+        // -----------------------------------------------------
         // YouTube fallback
+        // -----------------------------------------------------
 
         if (searchName.contains("youtube")) {
 
@@ -866,6 +1308,287 @@ public class MainActivity extends Activity {
                                 )
                         );
 
-                startActivity(browser);
+                startActivity(
+                        browser
+                );
 
- 
+                statusText.setText(
+                        "YouTube open kar raha hoon"
+                );
+
+                speak(
+                        "Opening YouTube."
+                );
+
+                return;
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        // -----------------------------------------------------
+        // Browser search fallback
+        // -----------------------------------------------------
+
+        if (searchName.contains("google")
+                || searchName.contains("chrome")) {
+
+            try {
+
+                Intent browser =
+                        new Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                        "https://www.google.com"
+                                )
+                        );
+
+                startActivity(
+                        browser
+                );
+
+                statusText.setText(
+                        "Google open kar raha hoon"
+                );
+
+                speak(
+                        "Opening Google."
+                );
+
+                return;
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        // -----------------------------------------------------
+        // Not found
+        // -----------------------------------------------------
+
+        statusText.setText(
+                requestedName +
+                " installed app list me nahi mila"
+        );
+
+        speak(
+                "I could not find " +
+                requestedName
+        );
+    }
+
+    // =========================================================
+    // COMMON APP PACKAGES
+    // =========================================================
+
+    private String findCommonAppPackage(
+            String name) {
+
+        PackageManager pm =
+                getPackageManager();
+
+        String[] packages = {
+
+                "com.whatsapp",
+                "com.google.android.youtube",
+                "com.instagram.android",
+                "com.facebook.katana",
+                "org.telegram.messenger",
+                "com.google.android.apps.maps",
+                "com.google.android.gm",
+                "com.google.android.googlequicksearchbox",
+                "com.google.android.apps.messaging",
+                "com.android.settings",
+                "com.android.chrome"
+        };
+
+        for (String packageName : packages) {
+
+            try {
+
+                ApplicationInfo info =
+                        pm.getApplicationInfo(
+                                packageName,
+                                0
+                        );
+
+                String label =
+                        pm.getApplicationLabel(
+                                info
+                        ).toString();
+
+                String labelLower =
+                        label.toLowerCase(
+                                Locale.ROOT
+                        );
+
+                if (labelLower.equals(name)
+                        || labelLower.contains(name)
+                        || name.contains(labelLower)) {
+
+                    return packageName;
+                }
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        return null;
+    }
+
+    // =========================================================
+    // SETTINGS
+    // =========================================================
+
+    private void openSettings() {
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Settings.ACTION_SETTINGS
+                    );
+
+            startActivity(intent);
+
+            statusText.setText(
+                    "Settings open kar raha hoon"
+            );
+
+            speak(
+                    "Opening settings."
+            );
+
+        } catch (Exception e) {
+
+            speak(
+                    "I could not open settings."
+            );
+        }
+    }
+
+    // =========================================================
+    // ACCESSIBILITY SETTINGS
+    // =========================================================
+
+    private void openAccessibility() {
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    );
+
+            startActivity(intent);
+
+            statusText.setText(
+                    "Accessibility settings open hain"
+            );
+
+            speak(
+                    "Opening accessibility settings."
+            );
+
+        } catch (Exception e) {
+
+            speak(
+                    "I could not open accessibility settings."
+            );
+        }
+    }
+
+    // =========================================================
+    // CONTAINS ANY
+    // =========================================================
+
+    private boolean containsAny(
+            String text,
+            String... values) {
+
+        if (text == null) {
+            return false;
+        }
+
+        String lower =
+                text.toLowerCase(
+                        Locale.ROOT
+                );
+
+        for (String value : values) {
+
+            if (value == null) {
+                continue;
+            }
+
+            if (lower.equals(
+                    value.toLowerCase(Locale.ROOT)
+            )) {
+
+                return true;
+            }
+
+            if (lower.contains(
+                    value.toLowerCase(Locale.ROOT)
+            )) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // =========================================================
+    // TEXT TO SPEECH
+    // =========================================================
+
+    private void speak(
+            String text) {
+
+        if (text == null ||
+                text.trim().length() == 0) {
+
+            return;
+        }
+
+        if (jarvesVoice == null) {
+            return;
+        }
+
+        try {
+
+            jarvesVoice.speak(
+                    text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "JARVES_RESPONSE"
+            );
+
+        } catch (Exception ignored) {
+        }
+    }
+
+    // =========================================================
+    // DESTROY
+    // =========================================================
+
+    @Override
+    protected void onDestroy() {
+
+        if (jarvesVoice != null) {
+
+            try {
+
+                jarvesVoice.stop();
+                jarvesVoice.shutdown();
+
+            } catch (Exception ignored) {
+            }
+
+            jarvesVoice = null;
+        }
+
+        super.onDestroy();
+    }
+}
+```
