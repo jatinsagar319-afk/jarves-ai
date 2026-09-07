@@ -9,7 +9,6 @@ import android.provider.Settings;
 import android.net.Uri;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -40,7 +39,9 @@ public class MainActivity extends Activity {
                 findViewById(R.id.accessibilityButton);
 
         jarvesVoice = new TextToSpeech(this, result -> {
+
             if (result == TextToSpeech.SUCCESS) {
+
                 int languageResult =
                         jarvesVoice.setLanguage(Locale.getDefault());
 
@@ -62,6 +63,10 @@ public class MainActivity extends Activity {
 
         statusText.setText("Jarves ready");
     }
+
+    // ==================================================
+    // VOICE LISTENING
+    // ==================================================
 
     private void startListening() {
 
@@ -85,15 +90,21 @@ public class MainActivity extends Activity {
         );
 
         try {
+
             startActivityForResult(
                     intent,
                     VOICE_REQUEST
             );
+
         } catch (Exception e) {
+
             statusText.setText(
                     "Voice recognition available nahi hai."
             );
-            speak("Voice recognition is not available.");
+
+            speak(
+                    "Voice recognition is not available."
+            );
         }
     }
 
@@ -118,7 +129,8 @@ public class MainActivity extends Activity {
                             RecognizerIntent.EXTRA_RESULTS
                     );
 
-            if (results != null && !results.isEmpty()) {
+            if (results != null &&
+                    !results.isEmpty()) {
 
                 String command =
                         results.get(0).trim();
@@ -130,10 +142,27 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ==================================================
+    // COMMAND ENGINE
+    // ==================================================
+
     private void executeCommand(String command) {
 
+        if (command == null ||
+                command.trim().isEmpty()) {
+
+            return;
+        }
+
         String cmd =
-                command.toLowerCase(Locale.ROOT);
+                command.toLowerCase(Locale.ROOT).trim();
+
+        // Remove Jarves/Jarvis from command
+        cmd = cmd.replace("jarves", " ");
+        cmd = cmd.replace("jarvis", " ");
+        cmd = cmd.trim();
+
+        // ---------------- HOME ----------------
 
         if (containsAny(
                 cmd,
@@ -141,11 +170,15 @@ public class MainActivity extends Activity {
                 "go home",
                 "ghar",
                 "ghar jao",
-                "home jao"
+                "home jao",
+                "home par jao"
         )) {
+
             performHome();
             return;
         }
+
+        // ---------------- BACK ----------------
 
         if (containsAny(
                 cmd,
@@ -154,46 +187,142 @@ public class MainActivity extends Activity {
                 "peeche",
                 "piche",
                 "wapas",
-                "wapas jao"
+                "wapas jao",
+                "back jao"
         )) {
+
             performBack();
             return;
         }
+
+        // ---------------- RECENTS ----------------
 
         if (containsAny(
                 cmd,
                 "recent",
                 "recent apps",
                 "recent app",
-                "recent kholo"
+                "recent kholo",
+                "recent apps kholo"
         )) {
+
             performRecents();
             return;
         }
+
+        // ---------------- SETTINGS ----------------
 
         if (containsAny(
                 cmd,
                 "settings",
                 "setting",
-                "सेटिंग"
+                "सेटिंग",
+                "सेटिंग्स"
         )) {
+
             openSettings();
             return;
         }
 
+        // ---------------- ACCESSIBILITY ----------------
+
         if (containsAny(
                 cmd,
                 "accessibility",
+                "accessibility settings",
                 "phone control"
         )) {
+
             openAccessibility();
             return;
         }
+
+        // ---------------- SCROLL DOWN ----------------
+
+        if (containsAny(
+                cmd,
+                "scroll down",
+                "scroll neeche",
+                "neeche scroll",
+                "neeche scroll karo",
+                "niche scroll",
+                "niche scroll karo",
+                "down scroll"
+        )) {
+
+            performScrollDown();
+            return;
+        }
+
+        // ---------------- SCROLL UP ----------------
+
+        if (containsAny(
+                cmd,
+                "scroll up",
+                "scroll upar",
+                "upar scroll",
+                "upar scroll karo",
+                "up scroll"
+        )) {
+
+            performScrollUp();
+            return;
+        }
+
+        // ---------------- CLICK COMMAND ----------------
+
+        if (containsAny(
+                cmd,
+                "click",
+                "click karo",
+                "dabao",
+                "daba do",
+                "open button",
+                "button dabao",
+                "par click karo"
+        )) {
+
+            String target =
+                    extractClickTarget(cmd);
+
+            if (!target.isEmpty()) {
+
+                performClick(target);
+
+                return;
+            }
+        }
+
+        // ---------------- TYPE COMMAND ----------------
+
+        if (containsAny(
+                cmd,
+                "type",
+                "type karo",
+                "likho",
+                "likh do",
+                "enter karo",
+                "text likho"
+        )) {
+
+            String text =
+                    extractTypeText(cmd);
+
+            if (!text.isEmpty()) {
+
+                performType(text);
+
+                return;
+            }
+        }
+
+        // ---------------- OPEN APP ----------------
 
         String appName =
                 extractAppName(cmd);
 
         if (!appName.isEmpty()) {
+
             openInstalledApp(appName);
             return;
         }
@@ -202,8 +331,272 @@ public class MainActivity extends Activity {
                 "Command received: " + command
         );
 
-        speak("Command received.");
+        speak(
+                "Command received."
+        );
     }
+
+    // ==================================================
+    // CLICK TARGET EXTRACTION
+    // ==================================================
+
+    private String extractClickTarget(String command) {
+
+        String target = command;
+
+        String[] removeWords = {
+
+                "jarves",
+                "jarvis",
+
+                "click",
+                "click karo",
+                "click kar",
+                "dabao",
+                "daba do",
+                "button",
+                "par",
+                "pe",
+                "ko"
+        };
+
+        for (String word : removeWords) {
+
+            target = target.replace(
+                    word,
+                    " "
+            );
+        }
+
+        return target.trim();
+    }
+
+    // ==================================================
+    // TYPE TEXT EXTRACTION
+    // ==================================================
+
+    private String extractTypeText(String command) {
+
+        String text = command;
+
+        String[] removeWords = {
+
+                "jarves",
+                "jarvis",
+
+                "type",
+                "type karo",
+                "type kar",
+                "likho",
+                "likh do",
+                "enter karo",
+                "text",
+                "mein",
+                "me",
+                "karo"
+        };
+
+        for (String word : removeWords) {
+
+            text = text.replace(
+                    word,
+                    " "
+            );
+        }
+
+        return text.trim();
+    }
+
+    // ==================================================
+    // CLICK SCREEN TEXT
+    // ==================================================
+
+    private void performClick(String target) {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            statusText.setText(
+                    "Accessibility service active nahi hai."
+            );
+
+            speak(
+                    "Phone control service is not active."
+            );
+
+            return;
+        }
+
+        boolean result =
+                service.clickText(target);
+
+        if (result) {
+
+            statusText.setText(
+                    target + " par click kar diya"
+            );
+
+            speak(
+                    "Clicked " + target
+            );
+
+        } else {
+
+            statusText.setText(
+                    target + " screen par nahi mila"
+            );
+
+            speak(
+                    "I could not find " + target
+            );
+        }
+    }
+
+    // ==================================================
+    // TYPE TEXT
+    // ==================================================
+
+    private void performType(String text) {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            statusText.setText(
+                    "Accessibility service active nahi hai."
+            );
+
+            speak(
+                    "Phone control service is not active."
+            );
+
+            return;
+        }
+
+        boolean focused =
+                service.focusEditableField();
+
+        boolean typed =
+                service.typeText(text);
+
+        if (focused && typed) {
+
+            statusText.setText(
+                    "Text type kar diya: " + text
+            );
+
+            speak(
+                    "Text typed."
+            );
+
+        } else if (typed) {
+
+            statusText.setText(
+                    "Text type kar diya: " + text
+            );
+
+            speak(
+                    "Text typed."
+            );
+
+        } else {
+
+            statusText.setText(
+                    "Text field nahi mila."
+            );
+
+            speak(
+                    "I could not find a text field."
+            );
+        }
+    }
+
+    // ==================================================
+    // SCROLL DOWN
+    // ==================================================
+
+    private void performScrollDown() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            speak(
+                    "Phone control service is not active."
+            );
+
+            return;
+        }
+
+        if (service.scrollForward()) {
+
+            statusText.setText(
+                    "Neeche scroll kar raha hoon"
+            );
+
+            speak(
+                    "Scrolling down."
+            );
+
+        } else {
+
+            statusText.setText(
+                    "Scroll nahi ho saka"
+            );
+
+            speak(
+                    "I could not scroll down."
+            );
+        }
+    }
+
+    // ==================================================
+    // SCROLL UP
+    // ==================================================
+
+    private void performScrollUp() {
+
+        JarvesAccessibilityService service =
+                JarvesAccessibilityService.getInstance();
+
+        if (service == null) {
+
+            speak(
+                    "Phone control service is not active."
+            );
+
+            return;
+        }
+
+        if (service.scrollBackward()) {
+
+            statusText.setText(
+                    "Upar scroll kar raha hoon"
+            );
+
+            speak(
+                    "Scrolling up."
+            );
+
+        } else {
+
+            statusText.setText(
+                    "Scroll nahi ho saka"
+            );
+
+            speak(
+                    "I could not scroll up."
+            );
+        }
+    }
+
+    // ==================================================
+    // HOME
+    // ==================================================
 
     private void performHome() {
 
@@ -213,20 +606,33 @@ public class MainActivity extends Activity {
         if (service != null) {
 
             if (service.goHome()) {
+
                 statusText.setText(
                         "Home par ja raha hoon"
                 );
-                speak("Going home.");
+
+                speak(
+                        "Going home."
+                );
+
             } else {
-                speak("I could not go home.");
+
+                speak(
+                        "I could not go home."
+                );
             }
 
         } else {
+
             speak(
                     "Phone control service is not active."
             );
         }
     }
+
+    // ==================================================
+    // BACK
+    // ==================================================
 
     private void performBack() {
 
@@ -236,20 +642,33 @@ public class MainActivity extends Activity {
         if (service != null) {
 
             if (service.globalBack()) {
+
                 statusText.setText(
                         "Back ja raha hoon"
                 );
-                speak("Going back.");
+
+                speak(
+                        "Going back."
+                );
+
             } else {
-                speak("I could not go back.");
+
+                speak(
+                        "I could not go back."
+                );
             }
 
         } else {
+
             speak(
                     "Phone control service is not active."
             );
         }
     }
+
+    // ==================================================
+    // RECENTS
+    // ==================================================
 
     private void performRecents() {
 
@@ -259,48 +678,73 @@ public class MainActivity extends Activity {
         if (service != null) {
 
             if (service.openRecents()) {
+
                 statusText.setText(
                         "Recent apps open kar raha hoon"
                 );
-                speak("Opening recent apps.");
+
+                speak(
+                        "Opening recent apps."
+                );
+
             } else {
+
                 speak(
                         "I could not open recent apps."
                 );
             }
 
         } else {
+
             speak(
                     "Phone control service is not active."
             );
         }
     }
 
+    // ==================================================
+    // APP NAME EXTRACTION
+    // ==================================================
+
     private String extractAppName(String command) {
 
         String name = command;
 
         String[] removeWords = {
+
                 "open",
                 "launch",
                 "start",
                 "run",
+
                 "khol",
                 "kholo",
+                "khol do",
+
                 "chalao",
                 "chala",
+
                 "app",
                 "application",
+
                 "jarves",
                 "jarvis"
         };
 
         for (String word : removeWords) {
-            name = name.replace(word, " ");
+
+            name = name.replace(
+                    word,
+                    " "
+            );
         }
 
         return name.trim();
     }
+
+    // ==================================================
+    // OPEN INSTALLED APP
+    // ==================================================
 
     private void openInstalledApp(
             String requestedName) {
@@ -327,7 +771,7 @@ public class MainActivity extends Activity {
         String searchName =
                 requestedName.toLowerCase(
                         Locale.ROOT
-                );
+                ).trim();
 
         for (ResolveInfo info : apps) {
 
@@ -352,7 +796,9 @@ public class MainActivity extends Activity {
 
                     if (launchIntent != null) {
 
-                        startActivity(launchIntent);
+                        startActivity(
+                                launchIntent
+                        );
 
                         statusText.setText(
                                 label +
@@ -371,8 +817,12 @@ public class MainActivity extends Activity {
             }
         }
 
+        // Common apps
+
         String packageName =
-                findCommonAppPackage(searchName);
+                findCommonAppPackage(
+                        searchName
+                );
 
         if (packageName != null) {
 
@@ -402,6 +852,8 @@ public class MainActivity extends Activity {
             }
         }
 
+        // YouTube fallback
+
         if (searchName.contains("youtube")) {
 
             try {
@@ -416,174 +868,4 @@ public class MainActivity extends Activity {
 
                 startActivity(browser);
 
-                speak("Opening YouTube.");
-
-                return;
-
-            } catch (Exception ignored) {
-            }
-        }
-
-        statusText.setText(
-                requestedName +
-                " installed app list me nahi mila"
-        );
-
-        speak(
-                "I could not find " +
-                requestedName
-        );
-    }
-
-    private String findCommonAppPackage(
-            String name) {
-
-        PackageManager pm =
-                getPackageManager();
-
-        String[] packages;
-
-        if (name.contains("whatsapp")) {
-
-            packages = new String[]{
-                    "com.whatsapp",
-                    "com.whatsapp.w4b"
-            };
-
-        } else if (name.contains("youtube")) {
-
-            packages = new String[]{
-                    "com.google.android.youtube"
-            };
-
-        } else if (name.contains("instagram")) {
-
-            packages = new String[]{
-                    "com.instagram.android"
-            };
-
-        } else if (name.contains("facebook")) {
-
-            packages = new String[]{
-                    "com.facebook.katana"
-            };
-
-        } else if (name.contains("telegram")) {
-
-            packages = new String[]{
-                    "org.telegram.messenger"
-            };
-
-        } else {
-
-            return null;
-        }
-
-        for (String packageName : packages) {
-
-            try {
-
-                ApplicationInfo info =
-                        pm.getApplicationInfo(
-                                packageName,
-                                0
-                        );
-
-                if (info != null) {
-                    return packageName;
-                }
-
-            } catch (
-                    PackageManager.NameNotFoundException ignored) {
-            }
-        }
-
-        return null;
-    }
-
-    private void openSettings() {
-
-        try {
-
-            Intent intent =
-                    new Intent(
-                            Settings.ACTION_SETTINGS
-                    );
-
-            startActivity(intent);
-
-            statusText.setText(
-                    "Settings open kar raha hoon"
-            );
-
-            speak("Opening settings.");
-
-        } catch (Exception e) {
-
-            speak(
-                    "I could not open settings."
-            );
-        }
-    }
-
-    private void openAccessibility() {
-
-        try {
-
-            Intent intent =
-                    new Intent(
-                            Settings.ACTION_ACCESSIBILITY_SETTINGS
-                    );
-
-            startActivity(intent);
-
-            speak(
-                    "Opening accessibility settings."
-            );
-
-        } catch (Exception e) {
-
-            speak(
-                    "I could not open accessibility settings."
-            );
-        }
-    }
-
-    private boolean containsAny(
-            String text,
-            String... words) {
-
-        for (String word : words) {
-
-            if (text.contains(word)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void speak(String text) {
-
-        if (jarvesVoice != null) {
-
-            jarvesVoice.speak(
-                    text,
-                    TextToSpeech.QUEUE_FLUSH,
-                    null,
-                    "JARVES_RESPONSE"
-            );
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-
-        if (jarvesVoice != null) {
-            jarvesVoice.stop();
-            jarvesVoice.shutdown();
-        }
-
-        super.onDestroy();
-    }
-        }
+ 
